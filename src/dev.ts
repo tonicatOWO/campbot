@@ -3,6 +3,10 @@ import chokidar from "chokidar";
 import { DIService, MetadataStorage } from "discordx";
 
 import { bot } from "./bot.js";
+import { config } from "dotenv";
+
+config(); // Load environment variables from .env file
+
 
 // The following syntax should be used in the commonjs environment
 // const importPattern =  __dirname + "/{events,commands}/**/*.{ts,js}"
