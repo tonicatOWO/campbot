@@ -1,46 +1,36 @@
-FROM rust:1.82-slim as builder
+## build runner
+FROM node:lts-alpine as build-runner
 
-RUN apt-get update && apt-get install -y \
-  pkg-config \
-  libssl-dev \
-  build-essential \
-  cmake \
-  ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+# Set temp directory
+WORKDIR /tmp/app
 
-WORKDIR /app
+# Move package.json
+COPY package.json .
 
-COPY Cargo.toml ./
-COPY Cargo.lock ./
+# Install dependencies
+RUN npm install
 
-RUN mkdir src && echo "fn main() {}" > src/main.rs
-RUN cargo build --release
-RUN rm src/main.rs
-
+# Move source files
 COPY src ./src
-RUN touch src/main.rs && cargo build --release
+COPY tsconfig.json   .
 
-FROM debian:bookworm-slim
+# Build project
+RUN npm run build
 
-RUN apt-get update && apt-get install -y \
-  ca-certificates \
-  libssl3 \
-  iputils-ping \
-  curl \
-  dnsutils \
-  procps \
-  && rm -rf /var/lib/apt/lists/* \
-  && apt-get clean
+## production runner
+FROM node:lts-alpine as prod-runner
 
-RUN useradd -r -s /bin/false -u 1000 botuser
-
+# Set work directory
 WORKDIR /app
 
-COPY --from=builder /app/target/release/campbot /usr/local/bin/campbot
-RUN chmod +x /usr/local/bin/campbot
+# Copy package.json from build-runner
+COPY --from=build-runner /tmp/app/package.json /app/package.json
 
-RUN mkdir -p /app && chown botuser:botuser /app
+# Install dependencies
+RUN npm install --omit=dev
 
-USER botuser
-CMD ["campbot"]
+# Move build files
+COPY --from=build-runner /tmp/app/build /app/build
 
+# Start bot
+CMD [ "npm", "run", "start" ]
